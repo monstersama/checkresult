@@ -7,12 +7,17 @@
 @time: 2018/11/3 10:26
 @tools: Pycharm 2018.1
 """
+"""
+update:
+优化了循环逻辑
+简化了数据库路径配置
+"""
 
 """
 当前检查的功能：（*标记的为未实现）
 1.非内容字段包含HTML标签  
 2.内容标签截断
-3.发布时间格式错误
+3.标题、发布时间格式错误
 4.标签采集结果为空
 6.非标讯检查
 11.内容中包含input标签，未把标签内的值替换出来（在后续流程中标签会被去掉，这样会导致未提取的值也会被去掉造成内容不全
@@ -26,21 +31,23 @@
 import sqlite3
 import re
 
+# 配置数据库路径
+r_path = r'''D:\7个火车头\标讯采集\Configuration\config.db3'''
+j_path = r'''D:\7个火车头\标讯采集\Data\%s\SpiderResult.db3'''
+
 # 连接数据库
 def connect_db(db_path): 
     return sqlite3.connect(db_path)
 
 # 检查规则
-def check_rule(db_path):
-    siteid = int(input("Please input siteid: "))
+def check_rule(siteid, db_path):
+
 
     # 校验是否为当前检查的组
     sqlcheck = '''SELECT Job.jobId, Job.JobName, Site.SiteId, Site.SiteName FROM Job, Site
     WHERE Job.SiteId = Site.SiteId
-    AND Job.SiteId = %d
+    AND Job.SiteId = %s
     LIMIT 1'''%siteid
-
-
 
     # 检查发布时间为系统时间是否标记-A
     sqldatecheck = """
@@ -165,6 +172,14 @@ def check_content(job_path):
     AND 内容 != ''
     '''
 
+    # 检查标题或发布时间格式是否正确
+    sql6 = '''SELECT ID, 标题, 发布时间 FROM Content WHERE 已采=1
+    AND 标题 IS NOT NULL
+    AND 标题 != ''
+    AND 发布时间 IS NOT NULL
+    AND 发布时间 != ''
+    '''
+
 
     conn = connect_db(job_path)
     cursor = conn.cursor()
@@ -210,6 +225,21 @@ def check_content(job_path):
                 if judge_value != 1:
                     print('{}\t {}\t {tip}'.format(job5[0], job5[1], tip='采集内容不是标讯(经作参考)'))
             else:pass
+
+        print('\n---------检查标题、发布时间格式是否正确--------')
+        contents6 = cursor.execute(sql6)
+        for job6 in contents6:
+            title = job6[1]
+            publishtime = job6[2]
+            judge_value1 = check_title_form(title)
+            if judge_value1 == -1:
+                print('{}\t {}\t {tip}'.format(job6[0], job6[1], tip='标题前或后有空格'))
+            judge_value2 = check_publishtime_form(publishtime)
+            if judge_value2 == -1:
+                print('{}\t {}\t {tip}'.format(job6[0], job6[1], tip='发布时间有空格'))
+            if judge_value2 == -2:
+                print('{}\t {}\t {tip}'.format(job6[0], job6[1], tip='发布时间格式错误'))
+
     except sqlite3.OperationalError as e:
         pass
     except NotImplementedError as e:
@@ -248,54 +278,77 @@ def check_bidding(s_content):
         else:pass
     return None
 
+# 检查标题格式
+def check_title_form(s_content):
+    result = re.search(r'''^\s*|\s*$''', s_content)
+    if result.group() != '':
+        return -1
+    else:
+        return None
+
+# 检查发布时间格式
+def check_publishtime_form(s_content):
+    # 首尾空格检查
+    check_block = re.search(r'''^\s*|\s*$''', s_content)
+    if check_block.group() != '':
+        return -1
+    else:
+        # 格式检查
+        check_form = re.match(r'''^\d{4}-\d{1,2}-\d{1,2}$''', s_content)
+        if check_form == None:
+            return -2
+        else:
+            return None
+
+def get_jobs(siteid, db_path):
+    job_dic = {}
+    sql = '''SELECT j.jobid, j.jobname FROM "Job"j WHERE j.siteid = %s order by j.jobid''' % siteid
+    conn = connect_db(db_path)
+    cursor = conn.cursor()
+    try:
+        jobs = cursor.execute(sql)
+        job_dic = {jobid: jobname for (jobid, jobname) in jobs}
+        return job_dic
+    except sqlite3.OperationalError as e:
+        pass
+    except NotImplementedError as e:
+        print(str(e))
+    finally:
+        cursor.close()
+        conn.close()
 
 def check_db():
-    rule_path = r'''D:\7个火车头\标讯采集\Configuration\config.db3'''
-    i = 1
-    while i==1:
-        check = int(input("退出请输入0，检查规则请输入1，检查内容请输入2："))
-        if check == 1:
-            check_rule(rule_path)
-            print('\n-----本次规则检查结束-----\n')
-            i = int(input('返回请输入1，退出请输入2：'))
-        elif check == 2:
-            mark = int(input('执行单任务检查请输入1，执行多任务检查请输入0：'))
-            if mark == 1:
-                while mark==1:
-                    jobid = input("请输入任务ID：")
-                    job_path = ("D:\练习Hyt\火车采集器V8 2\Data\%s\SpiderResult.db3" % jobid)
-                    check_content(job_path)
-                    mark = int(input("退出输入0， 继续输入1，返回上一步输入2："))
-                    if mark == 0:
-                        return print('检查结束')
-                    elif mark == 1:
-                        pass
-                    else:
-                        i = 1
-            else:
-                mark = 1
-                while mark==1:
-                    startid = int(input('请输入任务开始的ID：'))
-                    endid = int(input('请输入任务结束的ID：'))
-                    print('---------开始进行批量检查---------\n')
-                    count = endid - startid
-                    for id in range(count+1):
-                        jobid = str(startid + id)
-                        print('\n*********开始检查ID为：%s的任务:*********\n' % jobid)
-                        job_path = "D:\练习Hyt\火车采集器V8 2\Data\%s\SpiderResult.db3" % jobid
+    while True:
+        siteid = input('input site ID = ')
+        print('input flag:\n1 --- check rule \n2 --- check content \n3 --- all check \n')
+        select_check = int(input('flag = '))
+        if select_check == 1:
+            # 检查规则
+            check_rule(siteid=siteid, db_path=r_path)
+            print('--- END')
+        elif select_check == 2:
+            # 选择检查某一个任务，或全部任务
+            job_dic = get_jobs(siteid=siteid,db_path=r_path)
+            while True:
+                print('id ', '---', 'jobname')
+                for jobid, jobname in job_dic.items():
+                    print(jobid, '---', jobname)
+                print('input a flag:\n1 --- check all \n0 --- exit \nid --- select one job\n')
+                selectid = int(input('flag = '))
+                if selectid == 1:
+                    for job_id, job_name in job_dic.items():
+                        print("\n--- 开始执行检查：", job_name, job_id, "\n")
+                        job_path = j_path %job_id
                         check_content(job_path)
-                    mark = int(input("退出输入0， 继续输入1，返回上一步输入2："))
-                    if mark == 0:
-                        return print('检查结束')
-                    elif mark == 1:
-                        pass
-                    else:
-                        i = 1
+                elif selectid == 0:
+                    print('--- END')
+                    break
+                else:
+                    job_path = j_path %selectid
+                    check_content(job_path)
         else:
-            return print('\n-----结束检查------\n')
-
-
-
+            print('--- exit')
+            break
 
 def main():
     check_db()
