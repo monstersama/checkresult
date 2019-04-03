@@ -3,7 +3,7 @@
 @author: MonsterHe
 @contact: yuntian.hee@gmail.com
 @version: python3.6
-@file: open_sql.py
+@file: bulletion_check.py
 @time: 2018/11/3 10:26
 @tools: Pycharm 2018.1
 """
