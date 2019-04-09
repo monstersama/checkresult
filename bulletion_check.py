@@ -2,7 +2,12 @@
 """
 @author: MonsterHe
 @contact: yuntian.hee@gmail.com
+<<<<<<< HEAD
 @version: python3.5
+=======
+@version: python3.6
+@file: bulletion_check.py
+>>>>>>> e12d1e7fe137adc438b9704b73ed999fed3df38d
 @time: 2018/11/3 10:26
 @tools: Pycharm 2018.1
 """
