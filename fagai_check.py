@@ -11,6 +11,7 @@
 update:
 优化了循环逻辑
 简化了数据库路径配置
+新增检查发改、环评的公告类型格式
 """
 
 """
@@ -31,27 +32,27 @@ update:
 import sqlite3
 import re
 
-
 r_path = r'''D:\7个火车头\25发改修复\Configuration\config.db3'''
 j_path = r'''D:\7个火车头\25发改修复\Data\%s\SpiderResult.db3'''
 
+
 # 连接数据库
-def connect_db(db_path): 
+def connect_db(db_path):
     return sqlite3.connect(db_path)
 
-# 检查规则
-def check_rule(siteid, db_path):
 
-    #校验
+# 检查标讯规则
+def check_rule(siteid, db_path):
+    # 校验
     sqlrule_first = """
     SELECT t.jobid,t.jobname,s.siteid,s.sitename FROM "Job" t,site s
     where
     t.siteid = s.siteid
     and t.siteid  in (%s)
     limit 1
-    """%siteid
-    
-    #检查历史规则任务名
+    """ % siteid
+
+    # 检查历史规则任务名
     sqlhis_check = """
     SELECT t.jobid,t.jobname,s.siteid,s.sitename FROM "Job" t,site s
     where
@@ -59,36 +60,36 @@ def check_rule(siteid, db_path):
     and t.siteid  in (%s)
     and s.sitename like '%%%%历史%%%%'
     and t.jobname not like '%%%%历史%%%%'
-    """%siteid
+    """ % siteid
 
-    #检查任务名长度；仅供参考
+    # 检查任务名长度；仅供参考
     sqljobnamelength = """
     SELECT t.jobid,t.jobname,s.siteid,s.sitename FROM "Job" t,site s
     where
     t.siteid = s.siteid
     and t.siteid  in (%s)
     and length(t.JobName) > 20
-    """%siteid
-    
-    #检查发布时间为系统时间是否标记-A
-    sqldatecheck ="""
+    """ % siteid
+
+    # 检查发布时间为系统时间是否标记-A
+    sqldatecheck = """
     SELECT jobid,jobname FROM "Job" t
     where t.siteid  in (%s)
     and (instr(t.xmldata,'ManualTimeStr="yyyy-MM-dd"')
     and JobName NOT LIKE '%%%%-A%%%%'
     )
-    """%siteid
+    """ % siteid
 
-    #检查使用系统时间做历史的规则
-    sqldatecheckhis ="""
+    # 检查使用系统时间做历史的规则
+    sqldatecheckhis = """
     SELECT jobid,jobname FROM "Job" t
     where t.siteid  in (%s)
     and (instr(t.xmldata,'ManualTimeStr="yyyy-MM-dd"')
     and JobName  LIKE '%%%%历史%%%%'
     )
-    """%siteid
-    
-    #标讯标签
+    """ % siteid
+
+    # 标讯标签
     sql1 = """
     SELECT t.jobid,t.jobname,s.siteid,s.sitename FROM "Job" t,site s
     where
@@ -103,49 +104,49 @@ def check_rule(siteid, db_path):
     or instr(t.xmldata,'<Rule LabelName="数据类型"') =0
     or instr(t.xmldata,'<Rule LabelName="标题"') =0
     );
-    """%siteid
+    """ % siteid
 
     sql2 = """
     SELECT jobid,jobname FROM "Job" t
     where t.siteid  in (%s)
     and instr(xmldata,'Rule LabelName="公告类型" GetDataType="0" StartStr="" EndStr="" RegexContent="" RegexCombine="" XpathContent="" XPathAttribue="0" TextRecognitionType="0" TextRecognitionCodeReturnType="1" LengthFiltOpertar="0" LengthFiltValue="0" LabelContentMust="" LabelContentForbid="" FileUrlMust="" FileSaveDir="" FileSaveFormat="" ManualType="0" ManualString="type01') =0
     and instr(xmldata,'Rule LabelName="公告类型" GetDataType="0" StartStr="" EndStr="" RegexContent="" RegexCombine="" XpathContent="" XPathAttribue="0" TextRecognitionType="0" TextRecognitionCodeReturnType="1" LengthFiltOpertar="0" LengthFiltValue="0" LabelContentMust="" LabelContentForbid="" FileUrlMust="" FileSaveDir="" FileSaveFormat="" ManualType="0" ManualString="type02') =0
-    """%siteid
+    """ % siteid
     sql3 = """
     SELECT jobid,jobname FROM "Job" t
     where t.siteid  in (%s)
     and instr(XmlData,'MaxSpiderPerNum="0" MaxOutPerNum="0"') = 0
-    """%siteid
+    """ % siteid
     sql4 = """
     SELECT jobid,jobname FROM "Job" t
     where t.siteid  in (%s)
     and instr(t.XmlData,'CheckUrlRepeat=""') = 0
-    """%siteid
+    """ % siteid
     sql5 = """
     SELECT jobid,jobname FROM "Job" t
     where t.siteid  in (%s)
     and(instr(t.XmlData,'new="201') > 0
     or instr(t.XmlData,'<FillBothEnd Start="201') > 0)
-    """%siteid
+    """ % siteid
     sql6 = """
     SELECT jobid,jobname FROM "Job" t
     where t.siteid  in (%s)
     and( instr(xmldata,'UrlRepeat=""') =0
     or instr(xmldata,'CheckUrlRepeat=""') =0)
-    """%siteid
+    """ % siteid
     sql7 = """
     SELECT JobId,JobName,substr(t.XmlData,instr(t.XmlData,'<Rule LabelName="数据类型')+345,3),substr(substr(XmlData,instr(XmlData,'<Rule LabelName="地区"'),420),instr(substr(XmlData,instr(XmlData,'<Rule LabelName="地区"'),420),'ManualString="')+13,9
     ),substr(substr(XmlData,instr(XmlData,'<Rule LabelName="来源"'),420),instr(substr(XmlData,instr(XmlData,'<Rule LabelName="来源"'),420),'ManualString="')+14,instr(substr(substr(XmlData,instr(XmlData,'<Rule LabelName="来源"'),420),instr(substr(XmlData,instr(XmlData,'<Rule LabelName="来源"'),420),'ManualString="')+13,40),'ManualTimeStr=')-4)
     FROM "Job" t
     where SiteId in (%s)
-    """%siteid
-    
+    """ % siteid
+
     conn = connect_db(db_path)
     cursor = conn.cursor()
     try:
         row11 = cursor.execute(sqlrule_first)
         for x11 in row11:
-            print("-------校验\n---------",x11,"\n------------")
+            print("-------校验\n---------", x11, "\n------------")
         row1 = cursor.execute(sql1)
         for x1 in row1:
             print(x1, '缺少标签')
@@ -166,16 +167,16 @@ def check_rule(siteid, db_path):
             print(x6, '检查网址重复未选上')
         row7 = cursor.execute(sqldatecheck)
         for xdate in row7:
-            print(xdate,'系统时间未标记-A')
+            print(xdate, '系统时间未标记-A')
         row71 = cursor.execute(sqldatecheckhis)
         for xdate in row71:
-            print(xdate,'系统时间不能做历史')
+            print(xdate, '系统时间不能做历史')
         row72 = cursor.execute(sqljobnamelength)
         for xdate in row72:
-            print(xdate,'任务名长度超过限定长度')
+            print(xdate, '任务名长度超过限定长度')
         row73 = cursor.execute(sqlhis_check)
         for xdate in row73:
-            print(xdate,'历史任务名格式错误')
+            print(xdate, '历史任务名格式错误')
         print('\n --- check rule finish')
     except NotImplementedError as error:
         print(str(error))
@@ -183,40 +184,39 @@ def check_rule(siteid, db_path):
         cursor.close()
         conn.close()
 
-# 环评规则检查
+
+# 环评、发改规则检查
 def env_check(siteid, db_path):
-    
-    #校验
+    # 校验
     sqlrule_first = """
     SELECT t.jobid,t.jobname,s.siteid,s.sitename FROM "Job" t,site s
     where
     t.siteid = s.siteid
     and t.siteid  in (%s)
     limit 1
-    """%siteid
+    """ % siteid
 
     sqljobnamelength = """
     SELECT t.jobid,t.jobname FROM "Job" t
     where t.siteid  in (%s)
     and length(t.JobName) > 20
-    """%siteid
-    
-    sqldatecheck ="""
+    """ % siteid
+
+    sqldatecheck = """
     SELECT jobid,jobname FROM "Job" t
     where t.siteid  in (%s)
     and (instr(t.xmldata,'ManualTimeStr="yyyy-MM-dd"')
     and JobName NOT LIKE '%%%%-A%%%%'
     )
-    """%siteid
+    """ % siteid
 
-    sqldatecheckhis ="""
+    sqldatecheckhis = """
     SELECT jobid,jobname FROM "Job" t
     where t.siteid  in (%s)
     and (instr(t.xmldata,'ManualTimeStr="yyyy-MM-dd"')
     and JobName  LIKE '%%%%历史%%%%'
     )
-    """%siteid
-    
+    """ % siteid
 
     sql1 = """
     SELECT jobid,jobname FROM "Job" t
@@ -229,37 +229,37 @@ def env_check(siteid, db_path):
     or instr(t.xmldata,'<Rule LabelName="标题"') =0
     
     );
-    """%siteid
+    """ % siteid
     sql3 = """
     SELECT jobid,jobname FROM "Job" t
     where t.siteid  in (%s)
     and instr(XmlData,'MaxSpiderPerNum="0" MaxOutPerNum="0"') = 0
-    """%siteid
+    """ % siteid
     sql4 = """
     SELECT jobid,jobname FROM "Job" t
     where t.siteid  in (%s)
     and instr(t.XmlData,'CheckUrlRepeat=""') = 0
-    """%siteid
+    """ % siteid
     sql5 = """
     SELECT jobid,jobname FROM "Job" t
     where t.siteid  in (%s)
     and(instr(t.XmlData,'new="201') > 0
     or instr(t.XmlData,'<FillBothEnd Start="201') > 0)
-    """%siteid
+    """ % siteid
     sql6 = """
     SELECT jobid,jobname FROM "Job" t
     where t.siteid  in (%s)
     and( instr(xmldata,'UrlRepeat=""') =0
     or instr(xmldata,'CheckUrlRepeat=""') =0)
-    """%siteid
-    
+    """ % siteid
+
     conn = connect_db(db_path)
     cursor = conn.cursor()
-    
+
     try:
         row11 = cursor.execute(sqlrule_first)
         for x11 in row11:
-            print("-------校验\n---------",x11,"\n------------")
+            print("-------校验\n---------", x11, "\n------------")
         row11 = cursor.execute(sqlrule_first)
         row1 = cursor.execute(sql1)
         for x1 in row1:
@@ -278,20 +278,22 @@ def env_check(siteid, db_path):
             print(x6, '检查网址重复未选上')
         row7 = cursor.execute(sqldatecheck)
         for xdate in row7:
-            print(xdate,'系统时间未标记-A')
+            print(xdate, '系统时间未标记-A')
         row71 = cursor.execute(sqldatecheckhis)
         for xdate in row71:
-            print(xdate,'系统时间不能做历史')
+            print(xdate, '系统时间不能做历史')
         row72 = cursor.execute(sqljobnamelength)
         for xdate in row72:
-            print(xdate,'任务名长度超过限定长度')
-        
+            print(xdate, '任务名长度超过限定长度')
+
         print('finish')
     except NotImplementedError as error:
         print(str(error))
     finally:
         cursor.close()
         conn.close()
+
+
 # 检查内容
 def check_content(job_path):
     # 检查非内容字段有无截断HTML标签
@@ -302,7 +304,7 @@ def check_content(job_path):
     OR 发布时间 LIKE '%<%'
     OR 发布时间 LIKE '%>%')
     '''
-    
+
     # 检查有空内容的字段
     sql2 = '''SELECT ID, 标题, 内容, 发布时间 FROM Content WHERE 已采=1
     AND (标题 IS NULL
@@ -310,7 +312,9 @@ def check_content(job_path):
     OR 发布时间 IS NULL
     OR 内容=''
     OR 发布时间=''
-    OR 标题='')
+    OR 标题=''
+    OR 公告类型 IS NULL
+    OR 公告类型='')
     '''
 
     # 检查内容标签中包含有input标签
@@ -336,6 +340,10 @@ def check_content(job_path):
     AND 发布时间 != ''
     '''
 
+    # 检查公告类型格式是否正确
+    sql7 = '''SELECT ID, 标题, 公告类型 FROM Content WHERE 已采=1
+    AND 公告类型 != ''
+    AND 公告类型 IS NOT NULL'''
 
     conn = connect_db(job_path)
     cursor = conn.cursor()
@@ -365,9 +373,12 @@ def check_content(job_path):
                 if result != None:
                     if result.group(0).count('<') != result.group(0).count('>'):
                         print("{}\t {}\t内容可能有截断标签".format(job4[0], job4[1]))
-                    else:pass
-                else:pass
-            else:pass
+                    else:
+                        pass
+                else:
+                    pass
+            else:
+                pass
         '''
         print('\n---------开始检查采集内容是否不为标讯（仅做参考）--------')
         contents5 = cursor.execute(sql5)
@@ -396,7 +407,15 @@ def check_content(job_path):
                 print('{}\t {}\t {tip}'.format(job6[0], job6[1], tip='发布时间有空格'))
             if judge_value2 == -2:
                 print('{}\t {}\t {tip}'.format(job6[0], job6[1], tip='发布时间格式错误'))
-       
+
+        print('\n---------检查公告类型格式是否正确--------')
+        contents7 = cursor.execute(sql7)
+        for job7 in contents7:
+            bidtype = job7[2]
+            judge_value3 = check_bidtype_form(bidtype)
+            if judge_value3 == -1:
+                print('{}\t {}\t {tip}'.format(job7[0], job7[1], tip='公告类型前后有空格'))
+
     except sqlite3.OperationalError as e:
         pass
     except NotImplementedError as e:
@@ -406,22 +425,25 @@ def check_content(job_path):
         cursor.close()
         conn.close()
 
+
 # 检查非标讯
 def check_title(s_title):
-    targets = ['中标','招标','议标','废标','流标','邀标','询价','谈判','采购',
-              '比选','磋商','成交','竞价','竞投','中选','邀请招标','投标',
-              '竞谈','单一来源','竞争性','竞选','评标','项目结果公示','竞标',
-              '摇珠','开标','招商','确标','询比价','补遗','中选','发包','补遗',
-              '答疑','项目限价','竞标','竞选','议价','竟标','招租','询标','遴选','标段','工程'
+    targets = ['中标', '招标', '议标', '废标', '流标', '邀标', '询价', '谈判', '采购',
+               '比选', '磋商', '成交', '竞价', '竞投', '中选', '邀请招标', '投标',
+               '竞谈', '单一来源', '竞争性', '竞选', '评标', '项目结果公示', '竞标',
+               '摇珠', '开标', '招商', '确标', '询比价', '补遗', '中选', '发包', '补遗',
+               '答疑', '项目限价', '竞标', '竞选', '议价', '竟标', '招租', '询标', '遴选', '标段', '工程'
                ]
 
-    not_targets = ['条例','规定','工作','规范','标准','荣获','招聘','试行','行动']
+    not_targets = ['条例', '规定', '工作', '规范', '标准', '荣获', '招聘', '试行', '行动']
 
     for target in targets:
         if target in s_title:
             return 1
-        else:pass
+        else:
+            pass
     return -1
+
 
 # 检查标讯是否被过滤
 def check_bidding(s_content):
@@ -433,8 +455,10 @@ def check_bidding(s_content):
     for target in targets:
         if target in s_content:
             return 1
-        else:pass
+        else:
+            pass
     return None
+
 
 # 检查标题格式
 def check_title_form(s_content):
@@ -444,19 +468,30 @@ def check_title_form(s_content):
     else:
         return None
 
+
 # 检查发布时间格式
 def check_publishtime_form(s_content):
     # 首尾空格检查
-    check_block = re.search(r'''^\s*|\s*$''', s_content)
+    check_block = re.search(r'^\s*|\s*$', s_content)
     if check_block.group() != '':
         return -1
     else:
         # 格式检查
-        check_form = re.match(r'''^\d{4}-\d{1,2}-\d{1,2}$''', s_content)
+        check_form = re.match(r'^\d{4}-\d{1,2}-\d{1,2}$', s_content)
         if check_form == None:
             return -2
         else:
             return None
+
+
+# 检查公告类型格式
+def check_bidtype_form(s_content):
+    # 首尾空格检查
+    check_block = re.search(r'^\s*|\s*$', s_content)
+    if check_block.group() != '':
+        return -1
+    else:
+        return None
 
 def get_jobs(siteid, db_path):
     '''获取一个组的任务字典'''
@@ -476,6 +511,7 @@ def get_jobs(siteid, db_path):
         cursor.close()
         conn.close()
 
+
 def check_db():
     while True:
         try:
@@ -491,7 +527,7 @@ def check_db():
                 print('--- END')
             elif select_check == 2:
                 # 选择检查某一个任务，或全部任务
-                job_dic = get_jobs(siteid=siteid,db_path=r_path)
+                job_dic = get_jobs(siteid=siteid, db_path=r_path)
                 while True:
                     print('id ', '---', 'jobname')
                     for jobid, jobname in job_dic.items():
@@ -501,34 +537,23 @@ def check_db():
                     if selectid == 1:
                         for job_id, job_name in job_dic.items():
                             print("\n--- 开始执行检查：", job_name, job_id, "\n")
-                            job_path = j_path %job_id
+                            job_path = j_path % job_id
                             check_content(job_path)
                     elif selectid == 0:
                         print('--- END')
                         break
                     else:
-                        job_path = j_path %selectid
+                        job_path = j_path % selectid
                         check_content(job_path)
 
             else:
                 print('--- exit')
                 break
 
-        
 
 def main():
     check_db()
 
+
 if __name__ == '__main__':
     main()
-
-
-
-    
-
-        
-
-
-
-
-
