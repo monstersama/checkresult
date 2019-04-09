@@ -2,8 +2,7 @@
 """
 @author: MonsterHe
 @contact: yuntian.hee@gmail.com
-@version: python3.6
-@file: open_sql.py
+@version: python3.5
 @time: 2018/11/3 10:26
 @tools: Pycharm 2018.1
 """
@@ -30,11 +29,18 @@ update:
 
 import sqlite3
 import re
+import os
+
+def create_result_db(path):
+    folder = os.path.exists(path)
+
+    pass
+
 
 # 配置数据库路径
 r_path = r'''D:\7个火车头\标讯采集\Configuration\config.db3'''
 j_path = r'''D:\7个火车头\标讯采集\Data\%s\SpiderResult.db3'''
-
+result_db_path = r'd:\checkresult'
 # 连接数据库
 def connect_db(db_path): 
     return sqlite3.connect(db_path)
